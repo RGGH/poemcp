@@ -2,6 +2,9 @@ use poem::{listener::TcpListener, middleware::Cors, EndpointExt, Route, Server};
 use poem_mcpserver::{sse::sse_endpoint, tool::Text, McpServer, Tools};
 use std::net::{Ipv4Addr, IpAddr};
 use std::str::FromStr;
+use std::time::Duration;
+use tokio::time::timeout;
+use tokio::net::TcpStream;
 
 /// Combined tool that contains counter, adder, IP validator, and CIDR checker functionality
 struct CombinedTool {
@@ -51,6 +54,21 @@ impl CombinedTool {
         match ip_str.parse::<Ipv4Addr>() {
             Ok(_) => Text(true),
             Err(_) => Text(false),
+        }
+    }
+
+    /// Check if a specific port is open on a host
+    ///
+    /// Parameters:
+    /// - host : the hostname or IP Address
+    /// - port : the port number to check
+    async fn port_scan(&self,host:String,port:u16)->Text<bool>{
+        let addr  = format!("{}:{}",host,port);
+        let timeout_duration = Duration::from_secs(3);
+
+        match timeout(timeout_duration,TcpStream::connect(&addr)).await{
+            Ok(Ok(_))=>Text(true),
+            _ => Text(false),
         }
     }
     
@@ -120,6 +138,6 @@ async fn main() -> std::io::Result<()> {
         )
         .with(Cors::new());
     
-    println!("Server running at http://127.0.0.1:8000");
+    println!("MCP Server running at http://127.0.0.1:8000");
     Server::new(listener).run(app).await
 }
